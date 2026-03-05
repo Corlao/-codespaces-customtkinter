@@ -1,0 +1,109 @@
+import customtkinter as ctk
+import sqlite3
+
+class BancoDeDados:
+    def __init__(self, db_name='orcamento.db'):
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        self.criar_tabelas()
+    
+    def criar_tabelas(self):
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS despesas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                descricao TEXT NOT NULL,
+                valor REAL NOT NULL,
+                status TEXT DEFAULT 'ativo'
+            )
+        """)
+        self.conn.commit()
+    
+    def adicionar_despesa(self, descricao, valor):
+        self.cursor.execute(
+            "INSERT INTO despesas (descricao, valor, status) VALUES (?, ?, ?)",
+            (descricao, valor, 'ativo')
+        )
+        self.conn.commit()
+    
+    def obter_total(self):
+        self.cursor.execute("SELECT SUM(valor) FROM despesas WHERE status='ativo'")
+        return self.cursor.fetchone()[0] or 0
+    
+    def fechar(self):
+        self.conn.close()
+
+class AppOrcamento(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        
+        self.title("Orçamento - UTFPR")
+        self.geometry("600x400")
+        
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        
+        self.db = BancoDeDados()
+        
+        # Label de título
+        self.label = ctk.CTkLabel(
+            self, 
+            text="Total: R$ 0,00",
+            font=("Arial", 24, "bold")
+        )
+        self.label.pack(pady=20)
+        
+        # Entry para descrição
+        self.entry_desc = ctk.CTkEntry(
+            self, 
+            placeholder_text="Descrição",
+            width=300
+        )
+        self.entry_desc.pack(pady=10)
+        
+        # Entry para valor
+        self.entry_valor = ctk.CTkEntry(
+            self, 
+            placeholder_text="Valor (R$)",
+            width=150
+        )
+        self.entry_valor.pack(pady=10)
+        
+        # Botão adicionar
+        self.btn_add = ctk.CTkButton(
+            self,
+            text="Adicionar Despesa",
+            command=self.adicionar
+        )
+        self.btn_add.pack(pady=10)
+        
+        # Botão atualizar
+        self.btn_update = ctk.CTkButton(
+            self,
+            text="Atualizar Total",
+            command=self.atualizar
+        )
+        self.btn_update.pack(pady=10)
+    
+    def adicionar(self):
+        desc = self.entry_desc.get()
+        try:
+            valor = float(self.entry_valor.get().replace(',', '.'))
+            self.db.adicionar_despesa(desc, valor)
+            self.entry_desc.delete(0, 'end')
+            self.entry_valor.delete(0, 'end')
+            self.atualizar()
+        except:
+            print("Erro: valor inválido")
+    
+    def atualizar(self):
+        total = self.db.obter_total()
+        self.label.configure(text=f"Total: R$ {total:.2f}")
+    
+    def on_close(self):
+        self.db.fechar()
+        self.destroy()
+
+if __name__ == "__main__":
+    app = AppOrcamento()
+    app.protocol("WM_DELETE_WINDOW", app.on_close)
+    app.mainloop()
